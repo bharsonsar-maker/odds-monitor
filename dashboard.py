@@ -559,11 +559,10 @@ with tab5:
             with st.expander(f"{row['home_team']} vs {row['away_team']} — {row['league_name']} · {row['spotted_at'].strftime('%b %d')}"):
                 c1, c2 = st.columns([2, 1])
                 with c1:
-                    result = st.selectbox(
-                        "Result",
-                        ["Select result...", "home_win", "away_win", "draw"],
-                        key=f"result_{row['match_id']}"
-                    )
+                    # In Tab 5, before the for loop
+                        pending_df = fdf[fdf["pending"]].sort_values("commence_time")
+                        pending_df = pending_df.drop_duplicates(subset="match_id")  # ← add this
+                    
                 with c2:
                     if result == "home_win":
                         profit = round(stake * row["home_odds"] - stake * 2)
