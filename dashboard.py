@@ -572,11 +572,9 @@ with tab5:
                         st.metric("Actual profit", f"+${profit:,}")
                     elif result == "draw":
                         st.metric("Actual loss", f"-${stake*2:,}")
-
-                if result != "Select result...":
-                    if result == "home_win":   ap = round(5000 * row["home_odds"] - 10000)
-                    elif result == "away_win": ap = round(5000 * row["away_odds"] - 10000)
-                    else:                      ap = -10000
+                        if selected_result == "home_win":   ap = round(5000 * row["home_odds"] - 10000)
+                        elif selected_result == "away_win": ap = round(5000 * row["away_odds"] - 10000)
+                        else:                               ap = -10000
 
                     if st.button(f"Save result", key=f"save_{row['match_id']}"):
                         success = supabase_patch("opportunities", row["match_id"], {
