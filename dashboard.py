@@ -47,14 +47,12 @@ html, body, [class*="css"] {
   color: var(--text);
 }
 
-/* sidebar */
 section[data-testid="stSidebar"] {
   background: var(--bg2) !important;
   border-right: 1px solid var(--border) !important;
 }
 section[data-testid="stSidebar"] * { font-family: 'Syne', sans-serif; }
 
-/* tabs */
 .stTabs [data-baseweb="tab-list"] {
   background: var(--bg2);
   border-bottom: 1px solid var(--border);
@@ -74,7 +72,6 @@ section[data-testid="stSidebar"] * { font-family: 'Syne', sans-serif; }
   border-bottom: 2px solid var(--green) !important;
 }
 
-/* metrics */
 div[data-testid="stMetric"] {
   background: var(--bg3);
   border: 1px solid var(--border);
@@ -86,7 +83,6 @@ div[data-testid="stMetricLabel"] { color: var(--muted) !important; font-size: 11
 div[data-testid="stMetricValue"] { color: var(--text) !important; font-family: 'Space Mono', monospace; }
 div[data-testid="stMetricDelta"] svg { display: none; }
 
-/* buttons */
 .stButton > button {
   background: transparent;
   border: 1px solid var(--border2);
@@ -102,7 +98,6 @@ div[data-testid="stMetricDelta"] svg { display: none; }
   box-shadow: 0 0 12px rgba(0,255,136,0.15);
 }
 
-/* expander */
 .streamlit-expanderHeader {
   background: var(--bg3) !important;
   border: 1px solid var(--border) !important;
@@ -110,7 +105,6 @@ div[data-testid="stMetricDelta"] svg { display: none; }
   font-family: 'Syne', sans-serif !important;
 }
 
-/* cards */
 .opp-card {
   background: var(--bg3);
   border: 1px solid var(--border);
@@ -139,12 +133,7 @@ div[data-testid="stMetricDelta"] svg { display: none; }
 .badge-blue   { background: rgba(68,136,255,0.1); color: var(--blue);  border: 1px solid rgba(68,136,255,0.2); }
 .badge-muted  { background: rgba(90,106,130,0.15);color: var(--muted); border: 1px solid rgba(90,106,130,0.2); }
 
-.stat-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
+.stat-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 
 .section-title {
   font-family: 'Space Mono', monospace;
@@ -155,14 +144,6 @@ div[data-testid="stMetricDelta"] svg { display: none; }
   margin-bottom: 14px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
-}
-
-.hero-number {
-  font-family: 'Space Mono', monospace;
-  font-size: 36px;
-  font-weight: 700;
-  color: var(--green);
-  line-height: 1;
 }
 
 .bk-chip {
@@ -179,10 +160,7 @@ div[data-testid="stMetricDelta"] svg { display: none; }
 
 .profit-positive { color: var(--green); font-family: 'Space Mono', monospace; font-weight: 700; }
 .profit-negative { color: var(--red);   font-family: 'Space Mono', monospace; font-weight: 700; }
-
 .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
-
-/* dataframe */
 .stDataFrame { border: 1px solid var(--border) !important; border-radius: 10px !important; overflow: hidden; }
 </style>
 """, unsafe_allow_html=True)
@@ -259,7 +237,11 @@ def load_data():
     df["league_name"]   = df["league"].map(LEAGUE_NAMES).fillna(df["league"])
     df["avg_odds"]      = ((df["home_odds"] + df["away_odds"]) / 2).round(2)
     df["ev_score"]      = (df["avg_odds"] - 2.0).round(3)
-    df["bet_placed"]    = df.get("bet_placed", False).fillna(False)
+    # FIX: df.get() returns scalar False when column missing — can't call .fillna() on it
+    if "bet_placed" in df.columns:
+        df["bet_placed"] = df["bet_placed"].fillna(False)
+    else:
+        df["bet_placed"] = False
     return df
 
 def demo_data():
@@ -348,9 +330,9 @@ fdf = df[df["spotted_at"] >= cutoff].copy()
 fdf = fdf[fdf["league_name"].isin(sel_leagues)]
 fdf = fdf[fdf["avg_odds"] >= min_odds_filter]
 
-if status_filter == "Pending":    fdf = fdf[fdf["pending"]]
-elif status_filter == "Won":      fdf = fdf[fdf["won"]]
-elif status_filter == "Lost":     fdf = fdf[fdf["lost"]]
+if status_filter == "Pending":      fdf = fdf[fdf["pending"]]
+elif status_filter == "Won":        fdf = fdf[fdf["won"]]
+elif status_filter == "Lost":       fdf = fdf[fdf["lost"]]
 elif status_filter == "Bet Placed": fdf = fdf[fdf["bet_placed"] == True]
 
 resolved = fdf[~fdf["pending"]].copy()
@@ -437,14 +419,14 @@ with tab1:
         st.markdown('<div class="section-title">Cumulative P&L simulation</div>', unsafe_allow_html=True)
         if not resolved.empty:
             r2 = resolved.sort_values("spotted_at").copy()
-            r2["sim"]  = r2["actual_profit"] * (stake / 5000)
+            r2["sim"]   = r2["actual_profit"] * (stake / 5000)
             r2["cumpl"] = r2["sim"].cumsum()
-            color_line = GREEN if r2["cumpl"].iloc[-1] >= 0 else RED
+            color_line  = GREEN if r2["cumpl"].iloc[-1] >= 0 else RED
             fig3 = go.Figure()
             fig3.add_trace(go.Scatter(
                 x=r2["spotted_at"], y=r2["cumpl"],
                 fill="tozeroy",
-                fillcolor=f"rgba(0,255,136,0.07)" if r2["cumpl"].iloc[-1] >= 0 else "rgba(255,68,85,0.07)",
+                fillcolor="rgba(0,255,136,0.07)" if r2["cumpl"].iloc[-1] >= 0 else "rgba(255,68,85,0.07)",
                 line=dict(color=color_line, width=2.5), name="P&L"
             ))
             fig3.add_hline(y=0, line_dash="dot", line_color="#243044")
@@ -494,11 +476,11 @@ with tab1:
 with tab2:
     c1, c2, c3 = st.columns(3)
     with c1:
-        sort_by = st.selectbox("Sort by", ["Most recent","Highest EV","Highest home odds","Highest away odds"])
+        sort_by = st.selectbox("Sort by", ["Most recent","Highest EV","Highest home odds","Highest away odds"], key="tab2_sort")
     with c2:
-        opp_filter = st.selectbox("Show", ["All","Pending only","Bet placed","Not bet placed"])
+        opp_filter = st.selectbox("Show", ["All","Pending only","Bet placed","Not bet placed"], key="tab2_filter")
     with c3:
-        league_quick = st.selectbox("League", ["All"] + list(LEAGUE_NAMES.values()))
+        league_quick = st.selectbox("League", ["All"] + list(LEAGUE_NAMES.values()), key="tab2_league")
 
     dff = fdf.copy()
     if opp_filter == "Pending only":      dff = dff[dff["pending"]]
@@ -518,11 +500,11 @@ with tab2:
         pa = round(stake * row["away_odds"] - stake * 2)
         is_placed = row.get("bet_placed", False) == True
 
-        if row["won"]:    rb = f'<span class="badge badge-green">✓ Won</span>'
-        elif row["lost"]: rb = f'<span class="badge badge-red">✗ Draw loss</span>'
-        else:             rb = f'<span class="badge badge-muted">⏳ Pending</span>'
+        if row["won"]:    rb = '<span class="badge badge-green">✓ Won</span>'
+        elif row["lost"]: rb = '<span class="badge badge-red">✗ Draw loss</span>'
+        else:             rb = '<span class="badge badge-muted">⏳ Pending</span>'
 
-        pb = f'<span class="badge badge-yellow">💰 Bet placed</span>' if is_placed else ''
+        pb = '<span class="badge badge-yellow">💰 Bet placed</span>' if is_placed else ''
         hb = row.get("home_bookmaker","Bet365") or "Bet365"
         ab = row.get("away_bookmaker","1xBet")  or "1xBet"
 
@@ -542,11 +524,9 @@ with tab2:
             st.markdown(header, unsafe_allow_html=True)
 
             mc1, mc2, mc3, mc4 = st.columns(4)
-            mc1.metric(f"🏠 {row['home_team']}", f"{row['home_odds']}x",
-                       f"via {hb}")
+            mc1.metric(f"🏠 {row['home_team']}", f"{row['home_odds']}x", f"via {hb}")
             mc2.metric("Draw (avoid)", f"{row['draw_odds']}x")
-            mc3.metric(f"✈️ {row['away_team']}", f"{row['away_odds']}x",
-                       f"via {ab}")
+            mc3.metric(f"✈️ {row['away_team']}", f"{row['away_odds']}x", f"via {ab}")
             mc4.metric("EV Score", f"+{row['ev_score']:.3f}")
 
             st.markdown("---")
@@ -572,7 +552,7 @@ with tab2:
                 )
                 if new_placed != is_placed:
                     if sb_patch("opportunities", row["match_id"], {"bet_placed": new_placed}):
-                        st.toast("Updated!" , icon="✅")
+                        st.toast("Updated!", icon="✅")
                         st.cache_data.clear()
                         st.rerun()
             with bc2:
@@ -616,7 +596,7 @@ with tab3:
             elif row["lost"]:
                 status_html = f'<span class="badge badge-red">✗ DRAW LOSS -${stake*2:,}</span>'
             else:
-                status_html = f'<span class="badge badge-yellow">⏳ AWAITING RESULT</span>'
+                status_html = '<span class="badge badge-yellow">⏳ AWAITING RESULT</span>'
 
             st.markdown(f"""
             <div class="opp-card {'opp-card-won' if row['won'] else 'opp-card-lost' if row['lost'] else 'opp-card-placed'}">
@@ -630,30 +610,18 @@ with tab3:
                 {status_html}
               </div>
               <div style="display:flex;gap:24px;margin-top:14px;flex-wrap:wrap">
-                <div>
-                  <div style="font-size:10px;color:#5a6a82;margin-bottom:3px">HOME ODDS</div>
-                  <div style="font-family:'Space Mono',monospace;color:#e8edf5">{row['home_odds']}x <span style="color:#5a6a82;font-size:11px">via {hb}</span></div>
-                </div>
-                <div>
-                  <div style="font-size:10px;color:#5a6a82;margin-bottom:3px">AWAY ODDS</div>
-                  <div style="font-family:'Space Mono',monospace;color:#e8edf5">{row['away_odds']}x <span style="color:#5a6a82;font-size:11px">via {ab}</span></div>
-                </div>
-                <div>
-                  <div style="font-size:10px;color:#5a6a82;margin-bottom:3px">IF HOME WINS</div>
-                  <div class="profit-positive">+${ph:,}</div>
-                </div>
-                <div>
-                  <div style="font-size:10px;color:#5a6a82;margin-bottom:3px">IF AWAY WINS</div>
-                  <div class="profit-positive">+${pa:,}</div>
-                </div>
-                <div>
-                  <div style="font-size:10px;color:#5a6a82;margin-bottom:3px">IF DRAW</div>
-                  <div class="profit-negative">-${stake*2:,}</div>
-                </div>
-                <div>
-                  <div style="font-size:10px;color:#5a6a82;margin-bottom:3px">EV SCORE</div>
-                  <div style="font-family:'Space Mono',monospace;color:#ffd000">+{row['ev_score']:.3f}</div>
-                </div>
+                <div><div style="font-size:10px;color:#5a6a82;margin-bottom:3px">HOME ODDS</div>
+                  <div style="font-family:'Space Mono',monospace;color:#e8edf5">{row['home_odds']}x <span style="color:#5a6a82;font-size:11px">via {hb}</span></div></div>
+                <div><div style="font-size:10px;color:#5a6a82;margin-bottom:3px">AWAY ODDS</div>
+                  <div style="font-family:'Space Mono',monospace;color:#e8edf5">{row['away_odds']}x <span style="color:#5a6a82;font-size:11px">via {ab}</span></div></div>
+                <div><div style="font-size:10px;color:#5a6a82;margin-bottom:3px">IF HOME WINS</div>
+                  <div class="profit-positive">+${ph:,}</div></div>
+                <div><div style="font-size:10px;color:#5a6a82;margin-bottom:3px">IF AWAY WINS</div>
+                  <div class="profit-positive">+${pa:,}</div></div>
+                <div><div style="font-size:10px;color:#5a6a82;margin-bottom:3px">IF DRAW</div>
+                  <div class="profit-negative">-${stake*2:,}</div></div>
+                <div><div style="font-size:10px;color:#5a6a82;margin-bottom:3px">EV SCORE</div>
+                  <div style="font-family:'Space Mono',monospace;color:#ffd000">+{row['ev_score']:.3f}</div></div>
               </div>
             </div>
             """, unsafe_allow_html=True)
@@ -661,13 +629,12 @@ with tab3:
         if not placed_resolved.empty:
             st.markdown('<div class="section-title" style="margin-top:20px">P&L from your bets</div>', unsafe_allow_html=True)
             pb2 = placed_resolved.sort_values("spotted_at").copy()
-            pb2["sim"] = pb2["actual_profit"] * (stake / 5000)
+            pb2["sim"]   = pb2["actual_profit"] * (stake / 5000)
             pb2["cumpl"] = pb2["sim"].cumsum()
             fig_pb = go.Figure()
             fig_pb.add_trace(go.Scatter(
                 x=pb2["spotted_at"], y=pb2["cumpl"],
-                fill="tozeroy",
-                fillcolor="rgba(0,255,136,0.07)",
+                fill="tozeroy", fillcolor="rgba(0,255,136,0.07)",
                 line=dict(color=GREEN, width=2.5),
             ))
             fig_pb.add_hline(y=0, line_dash="dot", line_color="#243044")
@@ -716,7 +683,7 @@ with tab4:
         st.plotly_chart(fig_ao, use_container_width=True)
 
     st.markdown('<div class="section-title">EV score over time</div>', unsafe_allow_html=True)
-    fs = fdf.sort_values("spotted_at")
+    fs = fdf.sort_values("spotted_at").copy()
     fig_ev = go.Figure()
     fig_ev.add_trace(go.Scatter(
         x=fs["spotted_at"], y=fs["ev_score"], mode="markers",
@@ -775,12 +742,12 @@ with tab5:
 
     st.markdown('<div class="section-title" style="margin-top:8px">Bookmaker strategy guide</div>', unsafe_allow_html=True)
     tips = [
-        ("🏆 Bet365", BLUE, "Best for Champions League & EPL. Competitive odds 48hrs before kickoff. Highest liquidity."),
-        ("⚡ 1xBet", GREEN, "Highest odds overall. Best for La Liga & Bundesliga. Check for early market releases."),
-        ("🎯 Pinnacle", YELLOW, "Sharpest lines, highest limits. Best for large stakes. No account restrictions."),
-        ("🌟 William Hill", GREEN2, "Strong for Premier League. Good early odds 3-4 days before match."),
-        ("🔥 Bwin", RED, "Strong for European leagues. Often releases markets earliest — good for shifts."),
-        ("💫 Unibet", "#aa88ff", "Good secondary source. Use to verify against primary bookmaker."),
+        ("🏆 Bet365",      BLUE,      "Best for Champions League & EPL. Competitive odds 48hrs before kickoff. Highest liquidity."),
+        ("⚡ 1xBet",       GREEN,     "Highest odds overall. Best for La Liga & Bundesliga. Check for early market releases."),
+        ("🎯 Pinnacle",    YELLOW,    "Sharpest lines, highest limits. Best for large stakes. No account restrictions."),
+        ("🌟 William Hill", GREEN2,   "Strong for Premier League. Good early odds 3-4 days before match."),
+        ("🔥 Bwin",        RED,       "Strong for European leagues. Often releases markets earliest — good for shifts."),
+        ("💫 Unibet",      "#aa88ff", "Good secondary source. Use to verify against primary bookmaker."),
     ]
     for name, color, tip in tips:
         st.markdown(f"""
@@ -798,18 +765,23 @@ with tab6:
     st.markdown('<div class="section-title">Update match results</div>', unsafe_allow_html=True)
     st.markdown("After a match ends, update the result here to track accuracy and P&L.")
 
-    pend_df = fdf[fdf["pending"]].sort_values("commence_time")
+    pend_df = fdf[fdf["pending"]].sort_values("commence_time").drop_duplicates(subset="match_id")
 
     if pend_df.empty:
         st.success("No pending matches!")
     else:
         st.markdown(f"**{len(pend_df)}** matches awaiting results")
-        for _, row in pend_df.head(30).iterrows():
+
+        for idx, (_, row) in enumerate(pend_df.head(30).iterrows()):
             with st.expander(f"{row['home_team']} vs {row['away_team']} · {row['league_name']} · {row['spotted_at'].strftime('%b %d')}"):
                 uc1, uc2, uc3 = st.columns([2,1,1])
+
                 with uc1:
-                    sel = st.selectbox("Result", ["Select...", "home_win", "away_win", "draw"],
-                                       key=f"res_{row['match_id']}")
+                    sel = st.selectbox(
+                        "Result",
+                        ["Select...", "home_win", "away_win", "draw"],
+                        key=f"res_{row['match_id']}_{idx}",
+                    )
                 with uc2:
                     if sel == "home_win":
                         p = round(stake * row["home_odds"] - stake * 2)
@@ -820,15 +792,18 @@ with tab6:
                     elif sel == "draw":
                         st.metric("Loss", f"-${stake*2:,}")
                 with uc3:
-                    placed_check = st.checkbox("Bet was placed", value=bool(row.get("bet_placed",False)),
-                                               key=f"bp_{row['match_id']}")
+                    placed_check = st.checkbox(
+                        "Bet was placed",
+                        value=bool(row.get("bet_placed", False)),
+                        key=f"bp_{row['match_id']}_{idx}",
+                    )
 
                 if sel != "Select...":
                     if sel == "home_win":   ap = round(5000 * row["home_odds"] - 10000)
                     elif sel == "away_win": ap = round(5000 * row["away_odds"] - 10000)
                     else:                   ap = -10000
 
-                    if st.button("💾 Save result", key=f"sv_{row['match_id']}"):
+                    if st.button("💾 Save result", key=f"sv_{row['match_id']}_{idx}"):
                         ok = sb_patch("opportunities", row["match_id"], {
                             "result": sel,
                             "actual_profit": ap,
@@ -856,15 +831,14 @@ with tab7:
 
     if not resolved.empty:
         r3 = resolved.sort_values("spotted_at").copy()
-        r3["sim"]   = r3["actual_profit"] * (stake / 5000)
-        r3["cumpl"] = r3["sim"].cumsum()
+        r3["sim"]    = r3["actual_profit"] * (stake / 5000)
+        r3["cumpl"]  = r3["sim"].cumsum()
         r3["wrrate"] = r3["won"].expanding().mean() * 100
 
         fig_pl = go.Figure()
         fig_pl.add_trace(go.Scatter(
             x=r3["spotted_at"], y=r3["cumpl"],
-            fill="tozeroy",
-            fillcolor="rgba(0,255,136,0.07)",
+            fill="tozeroy", fillcolor="rgba(0,255,136,0.07)",
             line=dict(color=GREEN, width=2.5), name="All opps"
         ))
         if not placed.empty and not placed[~placed["pending"]].empty:
