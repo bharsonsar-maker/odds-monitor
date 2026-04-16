@@ -217,12 +217,12 @@ LEAGUE_NAMES = {
 }
 
 BOOKMAKERS = {
-    "soccer_epl":                ["Bet365", "William Hill", "1xBet", "Unibet", "Betway"],
-    "soccer_uefa_champs_league": ["Bet365", "Bwin", "1xBet", "Pinnacle", "Betfair"],
-    "soccer_spain_la_liga":      ["Bet365", "Bwin", "1xBet", "Betsson", "Unibet"],
-    "soccer_germany_bundesliga": ["Bet365", "Bwin", "1xBet", "Betway", "Tipico"],
-    "soccer_italy_serie_a":      ["Bet365", "Sisal", "1xBet", "Snai", "Unibet"],
-    "soccer_france_ligue_one":   ["Bet365", "PMU", "1xBet", "Unibet", "Bwin"],
+    "soccer_epl":                ["Stake", "Polymarket"],
+    "soccer_uefa_champs_league": ["Stake", "Polymarket"],
+    "soccer_spain_la_liga":      ["Stake", "Polymarket"],
+    "soccer_germany_bundesliga": ["Stake", "Polymarket"],
+    "soccer_italy_serie_a":      ["Stake", "Polymarket"],
+    "soccer_france_ligue_one":   ["Stake", "Polymarket"],
 }
 
 # ── HELPER: Safe timestamp formatting ──────────────────────

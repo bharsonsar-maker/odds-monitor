@@ -3,6 +3,11 @@
   ODDS MONITOR BOT  —  odds_bot.py
   Runs 24/7, scans odds every hour, logs to Supabase,
   sends email alerts when both teams > 2x
+
+  Integrated sources:
+    - The Odds API (Bet365, 1xBet, etc.)
+    - Stake (custom fetcher)
+    - Polymarket (custom fetcher)
 ============================================================
 """
 
@@ -89,6 +94,8 @@ def log_opportunity(match: dict):
                 "home_odds":           match["home_odds"],
                 "away_odds":           match["away_odds"],
                 "draw_odds":           match["draw_odds"],
+                "home_bookmaker":      match.get("home_bookmaker"),
+                "away_bookmaker":      match.get("away_bookmaker"),
                 "profit_if_home_wins": profit_home,
                 "profit_if_away_wins": profit_away,
                 "loss_if_draw":        -(STAKE_PER_SIDE * 2),
@@ -101,10 +108,11 @@ def log_opportunity(match: dict):
         log.error(f"  Opportunity log failed: {e}")
 
 # ============================================================
-#   ODDS FETCHING
+#   ODDS FETCHING — The Odds API
 # ============================================================
 
-def fetch_odds(league: str) -> list:
+def fetch_odds_api(league: str) -> list:
+    """Fetch odds from The Odds API for a given league."""
     url = f"https://api.the-odds-api.com/v4/sports/{league}/odds"
     params = {
         "apiKey":      ODDS_API_KEY,
@@ -117,30 +125,42 @@ def fetch_odds(league: str) -> list:
         r = requests.get(url, params=params, timeout=10)
         r.raise_for_status()
         data = r.json()
-        log.info(f"  {league}: {len(data)} matches")
+        log.info(f"  [OddsAPI] {league}: {len(data)} matches")
         return data
     except Exception as e:
-        log.error(f"  {league} fetch failed: {e}")
+        log.error(f"  [OddsAPI] {league} fetch failed: {e}")
         return []
 
-def parse_best_odds(match: dict, league: str) -> dict | None:
-    home = match.get("home_team")
-    away = match.get("away_team")
-    commence = match.get("commence_time", "")
-    best = {"home": 0.0, "draw": 0.0, "away": 0.0}
+def parse_odds_api_match(raw: dict, league: str) -> dict | None:
+    """Parse a single match from The Odds API, extracting best odds and bookmaker names."""
+    home = raw.get("home_team")
+    away = raw.get("away_team")
+    commence = raw.get("commence_time", "")
 
-    for bk in match.get("bookmakers", []):
+    best = {
+        "home": 0.0,
+        "draw": 0.0,
+        "away": 0.0,
+        "home_bookmaker": None,
+        "away_bookmaker": None,
+    }
+
+    for bk in raw.get("bookmakers", []):
+        bookmaker_name = bk.get("title")
         for mkt in bk.get("markets", []):
             if mkt.get("key") != "h2h":
                 continue
             for o in mkt.get("outcomes", []):
-                n, p = o.get("name"), o.get("price", 0)
-                if n == home:
-                    best["home"] = max(best["home"], p)
-                elif n == away:
-                    best["away"] = max(best["away"], p)
-                elif n == "Draw":
-                    best["draw"] = max(best["draw"], p)
+                name = o.get("name")
+                price = o.get("price", 0)
+                if name == home and price > best["home"]:
+                    best["home"] = price
+                    best["home_bookmaker"] = bookmaker_name
+                elif name == away and price > best["away"]:
+                    best["away"] = price
+                    best["away_bookmaker"] = bookmaker_name
+                elif name == "Draw" and price > best["draw"]:
+                    best["draw"] = price
 
     if not best["home"] or not best["away"]:
         return None
@@ -154,9 +174,97 @@ def parse_best_odds(match: dict, league: str) -> dict | None:
         "home_odds":      round(best["home"], 2),
         "away_odds":      round(best["away"], 2),
         "draw_odds":      round(best["draw"], 2),
+        "home_bookmaker": best["home_bookmaker"],
+        "away_bookmaker": best["away_bookmaker"],
         "is_opportunity": best["home"] > MIN_ODDS and best["away"] > MIN_ODDS,
         "scanned_at":     datetime.now(timezone.utc).isoformat(),
     }
+
+# ============================================================
+#   CUSTOM FETCHER — Stake
+#   (Placeholder – implement API or web scraping)
+# ============================================================
+
+# Mapping from our internal league keys to whatever Stake uses
+STAKE_LEAGUE_MAP = {
+    "soccer_epl":                "england-premier-league",
+    "soccer_uefa_champs_league": "champions-league",
+    "soccer_spain_la_liga":      "spain-la-liga",
+    "soccer_germany_bundesliga": "germany-bundesliga",
+    "soccer_italy_serie_a":      "italy-serie-a",
+    "soccer_france_ligue_one":   "france-ligue-1",
+}
+
+def fetch_stake_odds(league: str) -> list:
+    """
+    Fetch match odds from Stake.com for a given league.
+    Returns a list of dicts in a format compatible with parse_custom_match().
+    """
+    # TODO: Implement actual Stake API or web scraping.
+    # Expected return format per match:
+    # {
+    #     "home_team": "Manchester City",
+    #     "away_team": "Arsenal",
+    #     "commence_time": "2026-04-20T15:00:00Z",
+    #     "home_odds": 2.15,
+    #     "away_odds": 3.10,
+    #     "draw_odds": 3.50,
+    #     "source": "Stake"
+    # }
+    log.info(f"  [Stake] {league}: (stub) no data fetched")
+    return []
+
+def parse_custom_match(match: dict, league: str) -> dict | None:
+    """
+    Parse a match dict from custom fetchers (Stake/Polymarket) into our standard format.
+    Expects match dict to already contain home_odds, away_odds, draw_odds, and source.
+    """
+    home = match.get("home_team")
+    away = match.get("away_team")
+    if not home or not away:
+        return None
+
+    home_odds = match.get("home_odds", 0)
+    away_odds = match.get("away_odds", 0)
+    draw_odds = match.get("draw_odds", 0)
+    source = match.get("source", "Custom")
+
+    return {
+        "match_id":       f"{home}vs{away}".replace(" ", "_"),
+        "home_team":      home,
+        "away_team":      away,
+        "league":         league,
+        "commence_time":  match.get("commence_time", ""),
+        "home_odds":      round(home_odds, 2),
+        "away_odds":      round(away_odds, 2),
+        "draw_odds":      round(draw_odds, 2),
+        "home_bookmaker": source,
+        "away_bookmaker": source,
+        "is_opportunity": home_odds > MIN_ODDS and away_odds > MIN_ODDS,
+        "scanned_at":     datetime.now(timezone.utc).isoformat(),
+    }
+
+# ============================================================
+#   CUSTOM FETCHER — Polymarket
+#   (Placeholder – implement API or web scraping)
+# ============================================================
+
+# Polymarket uses event-based markets; we need to map to our leagues
+POLYMARKET_LEAGUE_MAP = {
+    "soccer_epl":                "EPL",
+    "soccer_uefa_champs_league": "UCL",
+    # ...
+}
+
+def fetch_polymarket_odds(league: str) -> list:
+    """
+    Fetch odds from Polymarket for a given league.
+    Returns a list of dicts in the same format as Stake fetcher.
+    """
+    # TODO: Implement Polymarket API or scraping.
+    # Polymarket odds are binary (yes/no). You'll need to convert to three‑way odds.
+    log.info(f"  [Polymarket] {league}: (stub) no data fetched")
+    return []
 
 # ============================================================
 #   EMAIL — SMTP (GitHub Actions) with Gmail API fallback
@@ -237,7 +345,7 @@ def send_email(opportunities: list):
         log.error(f"  Email failed: {e}")
 
 # ============================================================
-#   MAIN SCANNER
+#   UNIFIED SCANNER (merges all sources)
 # ============================================================
 
 def scan():
@@ -248,18 +356,46 @@ def scan():
     seen          = set()
 
     for league in LEAGUES:
-        for raw in fetch_odds(league):
-            parsed = parse_best_odds(raw, league)
+        # 1. Fetch from The Odds API
+        for raw in fetch_odds_api(league):
+            parsed = parse_odds_api_match(raw, league)
             if not parsed or parsed["match_id"] in seen:
                 continue
             seen.add(parsed["match_id"])
             all_records.append(parsed)
             if parsed["is_opportunity"]:
                 log.info(f"  OPPORTUNITY -> {parsed['home_team']} vs {parsed['away_team']} "
-                         f"({parsed['home_odds']}x / {parsed['away_odds']}x)")
+                         f"({parsed['home_odds']}x / {parsed['away_odds']}x) [OddsAPI]")
                 opportunities.append(parsed)
                 log_opportunity(parsed)
-        time.sleep(1)
+
+        # 2. Fetch from Stake
+        for raw in fetch_stake_odds(league):
+            parsed = parse_custom_match(raw, league)
+            if not parsed or parsed["match_id"] in seen:
+                continue
+            seen.add(parsed["match_id"])
+            all_records.append(parsed)
+            if parsed["is_opportunity"]:
+                log.info(f"  OPPORTUNITY -> {parsed['home_team']} vs {parsed['away_team']} "
+                         f"({parsed['home_odds']}x / {parsed['away_odds']}x) [Stake]")
+                opportunities.append(parsed)
+                log_opportunity(parsed)
+
+        # 3. Fetch from Polymarket
+        for raw in fetch_polymarket_odds(league):
+            parsed = parse_custom_match(raw, league)
+            if not parsed or parsed["match_id"] in seen:
+                continue
+            seen.add(parsed["match_id"])
+            all_records.append(parsed)
+            if parsed["is_opportunity"]:
+                log.info(f"  OPPORTUNITY -> {parsed['home_team']} vs {parsed['away_team']} "
+                         f"({parsed['home_odds']}x / {parsed['away_odds']}x) [Polymarket]")
+                opportunities.append(parsed)
+                log_opportunity(parsed)
+
+        time.sleep(1)   # Be gentle to sources
 
     log_to_db(all_records)
 
@@ -275,6 +411,7 @@ def main():
     log.info("=" * 50)
     log.info("Odds Monitor Bot - Starting")
     log.info(f"Leagues: {len(LEAGUES)} | Threshold: >{MIN_ODDS}x | Interval: {SCAN_INTERVAL//60}min")
+    log.info("Sources: OddsAPI + Stake + Polymarket (custom fetchers)")
     log.info("=" * 50)
     while True:
         try:
