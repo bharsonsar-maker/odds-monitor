@@ -303,6 +303,9 @@ def load_data() -> pd.DataFrame:
     df["expired"] = df["commence_time"] < now_utc
     df["active"]  = ~df["expired"] & df["pending"]
 
+    # ✅ DEDUPLICATE: Keep only the latest entry per match_id
+    df = df.sort_values("spotted_at", ascending=False).drop_duplicates(subset=["match_id"], keep="first")
+
     return df
 
 def demo_data() -> pd.DataFrame:
